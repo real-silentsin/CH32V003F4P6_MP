@@ -1,0 +1,112 @@
+/********************************** (C) COPYRIGHT *******************************
+ * File Name          : main.c
+ * Author             : WCH
+ * Version            : V1.0.0
+ * Date               : 2023/12/26
+ * Description        : Main program body.
+*********************************************************************************
+* Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+* Attention: This software (modified or not) and binary are used for
+* microcontroller manufactured by Nanjing Qinheng Microelectronics.
+*******************************************************************************/
+
+/*
+ * PA6 (выв 1)		-	IR IN
+ * PA11 (выв 11)	-	SDA
+ * PA10 (выв 12)	-	SCL
+ *
+ */
+
+#include "debug.h"
+#include "SSS_Common_Lib_V1/sss_classes.h"
+#include "SSS_SSD1306_TXT_V3/SSD1306.h"
+#include "SSS_IRNEC_Lib.V1/sss_irnec_lib.h"
+
+/* Global define */
+
+/* Global Variable */
+
+// Перевод целого числа в символьное шестнадцатиричное
+// Полностью зависит от файла symbols.h и кодировки типа _symbol
+Params my_int_to_hex(uint8_t value) {
+    
+    Params result;
+    
+    result.value1 = HEX_STR[(value >> 4) & 0x0F];
+    result.value2 = HEX_STR[value & 0x0F];
+    
+    return result;
+}
+
+void print_hex_value(uint8_t value) {
+
+    Params tmp_data = my_int_to_hex(value);
+    SSD1306_BASE_PutSymbol(tmp_data.value1, 0);
+    SSD1306_BASE_PutSymbol(tmp_data.value2, 0);
+}
+
+int main(void)
+{
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    SystemCoreClockUpdate();
+    Delay_Init();
+
+    USART_Printf_Init(115200);
+    printf("SystemClk:%d\r\n", SystemCoreClock);
+    printf( "ChipID:%08x\r\n", DBGMCU_GetCHIPID() );
+    printf("IR NEC TEST\r\n");
+
+    SSD1306_BASE_Init (0xCF);
+
+    SSD1306_BASE_SetCursor(3, 5);
+    SSD1306_BASE_WriteStr((char *)"IRNEC", 5, SSD1306_SYMSTYLE_WIDE);
+
+    IR_Init();
+
+    Int32x deb_val = {0};
+
+    while(1)
+    {
+        SSD1306_BASE_SetCursor(0, 2);
+
+        switch (IR_GetStatus()) {
+            case IRDR_READY:
+
+                deb_val.cvalue[0] = IR_GetData(0);
+                deb_val.cvalue[1] = IR_GetData(1);
+                deb_val.cvalue[2] = IR_GetData(2);
+                deb_val.cvalue[3] = IR_GetData(3);
+                SSD1306_BASE_WriteStr((char *)"NORMAL", 6, 0);
+
+                break;
+
+            case IRDR_REPEAT:
+
+                deb_val.cvalue[0] = IR_GetLastData(0);
+                deb_val.cvalue[1] = IR_GetLastData(1);
+                deb_val.cvalue[2] = IR_GetLastData(2);
+                deb_val.cvalue[3] = IR_GetLastData(3);
+                SSD1306_BASE_WriteStr((char *)"REPEAT", 6, 0);
+
+                break;
+
+            default:
+
+                deb_val.cvalue[0] = 0;
+                deb_val.cvalue[1] = 0;
+                deb_val.cvalue[2] = 0;
+                deb_val.cvalue[3] = 0;
+                SSD1306_BASE_WriteStr((char *)"<NONE>", 6, 0);
+
+                break;
+        }
+        
+        SSD1306_BASE_SetCursor(0, 0);
+        print_hex_value(deb_val.cvalue[3]);
+        print_hex_value(deb_val.cvalue[2]);
+        print_hex_value(deb_val.cvalue[1]);
+        print_hex_value(deb_val.cvalue[0]);
+
+        Delay_Ms(1000);
+    }
+}

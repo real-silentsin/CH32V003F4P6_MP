@@ -1,0 +1,88 @@
+/********************************** (C) COPYRIGHT *******************************
+ * File Name          : main.c
+ * Author             : WCH
+ * Version            : V1.0.0
+ * Date               : 2023/12/25
+ * Description        : Main program body.
+ *********************************************************************************
+ * Copyright (c) 2021 Nanjing Qinheng Microelectronics Co., Ltd.
+ * Attention: This software (modified or not) and binary are used for
+ * microcontroller manufactured by Nanjing Qinheng Microelectronics.
+ *******************************************************************************/
+
+#include "debug.h"
+#include "SSS_DS18B20_Lib_V1/DS18B20.h"
+
+/* Global define */
+
+
+/* Global Variable */
+// Найденные сенсоры
+uint64_t sensors_id[3] = {0, 0, 0};
+uint8_t found_count = 0;
+
+/*********************************************************************
+ * @fn      main
+ *
+ * @brief   Main program.
+ *
+ * @return  none
+ */
+int main (void) {
+    NVIC_PriorityGroupConfig (NVIC_PriorityGroup_1);
+    SystemCoreClockUpdate();
+    Delay_Init();
+
+    SDI_Printf_Enable();
+
+    printf ("SystemClk:%d\r\n", SystemCoreClock);
+    printf ("ChipID:%08x\r\n", DBGMCU_GetCHIPID());
+
+    DS18B20_Init();
+
+    found_count = Discover_All_Sensors (sensors_id);
+
+    // -- Для одиночных датчиков -------------------------------
+    // DS18B20_ReadID();
+
+    // DS18B20_setResolution (DS_RES_9BIT);
+    // DS18B20_PrintPresets();
+    // ---------------------------------------------------------
+
+    // Разбиваем 64-битное число на две 32-битные части для printf
+    //uint32_t high = (uint32_t)(sensors_id[sens_idx] >> 32);
+    //uint32_t low = (uint32_t)(sensors_id[sens_idx] & 0xFFFFFFFF);
+
+    //printf ("Sensor: %08X%08X = ", high, low);
+
+    while (1) {
+
+        DS18B20_StartAll();  // Запуск преобразования для всех
+        Delay_Ms (800);      // Ждем завершения (для 12 бит)
+
+        for (uint8_t i = 0; i < found_count; i++) {
+
+            // Разбиваем 64-битное число на две 32-битные части для printf
+            uint32_t high = (uint32_t)(sensors_id[i] >> 32);
+            uint32_t low = (uint32_t)(sensors_id[i] & 0xFFFFFFFF);
+
+            printf ("Sensor: %08X%08X = ", high, low);
+
+            DS18B20_Data data = DS18B20_ReadSensor(sensors_id[i]);
+
+            if (data.is_valid) {
+                // Теперь вы на 100% уверены в этих цифрах
+                //printf ("%.2f C\r\n", data.temperature);
+                printf ("%s%d.%04d C\r\n",
+                        data.is_negative ? "-" : "",
+                        data.temp_c,
+                        data.temp_fract);
+            } else {
+
+                printf("CRC failed...\r\n");
+            }
+        }
+
+        Delay_Ms (3000);
+    }
+}
